@@ -1,6 +1,7 @@
 #ifndef __STPDLIB_HPP__
 #define __STPDLIB_HPP__
 
+#include <utility>
 #include <vector>
 #include <sys/stat.h>
 #include <string_view>
@@ -13,12 +14,13 @@
 #include <sstream>
 #include <array>
 
-#define BOLD_COLOR(x) (fmt::emphasis::bold | fmt::fg(x))
+#define _BOLD_COLOR(x) (fmt::emphasis::bold | fmt::fg(x))
+void ctrl_d_handler(std::istream& cin);
 
 template <typename... Args>
 void die(const std::string_view fmt, Args&&... args) noexcept
 {
-    fmt::print(stderr, BOLD_COLOR(fmt::rgb(fmt::color::red)), "ERROR: {}\n",
+    fmt::print(stderr, _BOLD_COLOR(fmt::rgb(fmt::color::red)), "ERROR: {}\n",
                  fmt::format(fmt::runtime(fmt), std::forward<Args>(args)...));
     std::exit(1);
 }
@@ -26,6 +28,33 @@ void die(const std::string_view fmt, Args&&... args) noexcept
 constexpr std::size_t operator""_len(const char*, std::size_t ln) noexcept
 { 
     return ln;
+}
+
+/** Ask the user a yes or no question.
+ * @param def The default result
+ * @param fmt The format string
+ * @param args Arguments in the format
+ * @returns the result, y = true, f = false, only returns def if the result is def
+ */
+template <typename... Args>
+bool askUserYorN(bool def, const std::string_view fmt, Args&&... args)
+{
+    const std::string& inputs_str = fmt::format("[{}/{}]: ", (def ? 'Y' : 'y'), (!def ? 'n' : 'n'));
+    std::string result;
+    fmt::println("{} {}", fmt::format(fmt, std::forward<Args>(args)...), inputs_str);
+
+    while (std::getline(std::cin, result) && (result.length() > 1))
+        fmt::print(_BOLD_COLOR(fmt::rgb(fmt::color::yellow)), ("Please answear y or n {}"), inputs_str);
+
+    ctrl_d_handler(std::cin);
+
+    if (result.empty())
+        return def;
+
+    if (def ? tolower(result[0]) != 'n' : tolower(result[0]) != 'y')
+        return def;
+
+    return !def;
 }
 
 namespace
@@ -57,13 +86,11 @@ std::vector<std::string> split(const std::string_view text, char delim)
     return vec;
 }
 
-/*
 void ctrl_d_handler(const std::istream& cin)
 {
     if (cin.eof())
         die("Exiting due to CTRL-D or EOF");
 }
-*/
 
 std::string which(const std::string& command)
 {
